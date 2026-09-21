@@ -6,6 +6,14 @@ enum PanelChrome {
     case titledSettings
 }
 
+/// How the panel interacts with other windows.
+enum PanelPresentation {
+    /// History launcher: floats near the cursor, can be non-activating.
+    case palette
+    /// Settings / onboarding: normal window level, can sit behind other apps, draggable.
+    case window
+}
+
 @MainActor
 final class FloatingPanelController {
     private var panel: NSPanel?
@@ -14,6 +22,7 @@ final class FloatingPanelController {
     private let size: NSSize
     private let chrome: PanelChrome
     private let activatesApplication: Bool
+    private let presentation: PanelPresentation
     private let cornerRadius: CGFloat = 20
     private let builder: (AppState) -> AnyView
 
@@ -21,11 +30,13 @@ final class FloatingPanelController {
         title: String,
         size: NSSize,
         chrome: PanelChrome,
+        presentation: PanelPresentation = .window,
         activatesApplication: Bool = true,
         @ViewBuilder content: @escaping (AppState) -> some View
     ) {
         self.size = size
         self.chrome = chrome
+        self.presentation = presentation
         self.activatesApplication = activatesApplication
         self.builder = { appState in AnyView(content(appState)) }
         _ = title
@@ -72,11 +83,18 @@ final class FloatingPanelController {
         case .borderlessRounded:
             style = [.borderless]
         case .titledSettings:
-            // Titled + closable so traffic lights sit inside the window chrome.
             style = [.titled, .closable, .fullSizeContentView]
         }
-        if !activatesApplication {
-            style.insert(.nonactivatingPanel)
+
+        switch presentation {
+        case .palette:
+            if !activatesApplication {
+                style.insert(.nonactivatingPanel)
+            }
+        case .window:
+            // Real titlebar chrome so the window is draggable like any other app window,
+            // even when we draw a custom header underneath.
+            style = [.titled, .closable, .fullSizeContentView]
         }
 
         let panel = KeyablePanel(
@@ -90,18 +108,31 @@ final class FloatingPanelController {
         panel.hidesOnDeactivate = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.level = .floating
-        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         panel.hasShadow = true
         panel.isMovable = true
         panel.isMovableByWindowBackground = true
+
+        switch presentation {
+        case .palette:
+            panel.level = .floating
+            panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        case .window:
+            panel.level = .normal
+            panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+            panel.titleVisibility = .hidden
+            panel.titlebarAppearsTransparent = true
+            panel.toolbar = nil
+            // Keep a system titlebar for dragging; hide traffic lights — views have their own close.
+            panel.standardWindowButton(.closeButton)?.isHidden = true
+            panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+            panel.standardWindowButton(.zoomButton)?.isHidden = true
+        }
 
         if chrome == .titledSettings {
             panel.title = "Settings"
             panel.titleVisibility = .hidden
             panel.titlebarAppearsTransparent = true
             panel.toolbar = nil
-            // Keep standard traffic-light inset inside the rounded content.
             panel.standardWindowButton(.closeButton)?.isHidden = false
             panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
             panel.standardWindowButton(.zoomButton)?.isHidden = true
@@ -140,6 +171,8 @@ final class FloatingPanelController {
 
     private func installKeyMonitor() {
         removeKeyMonitor()
+        // Palette dismisses on Escape; ordinary windows use the close button / traffic light.
+        guard presentation == .palette else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, self.panel?.isVisible == true else { return event }
             if event.keyCode == 53 {

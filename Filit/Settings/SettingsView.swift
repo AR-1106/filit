@@ -113,7 +113,7 @@ struct SettingsView: View {
             )
         }
         .padding(.horizontal, 24)
-        .padding(.top, 16)
+        .padding(.top, 28)
         .padding(.bottom, 16)
     }
 
@@ -674,28 +674,75 @@ struct SnippetQuickEditor: View {
 }
 
 struct HotkeyRecorderRow: View {
+    @EnvironmentObject private var appState: AppState
     let title: String
     @Binding var shortcut: KeyboardShortcutSpec
     @State private var isRecording = false
+    @State private var recordHint: String?
 
     var body: some View {
         HStack {
             Text(title)
                 .font(.system(size: 13))
             Spacer()
+            if let recordHint {
+                Text(recordHint)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
             Button {
-                isRecording.toggle()
+                if isRecording {
+                    stopRecording()
+                } else {
+                    startRecording()
+                }
             } label: {
                 Text(isRecording ? "Press keys…" : shortcut.displayString)
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .frame(minWidth: 64)
+                    .frame(minWidth: 72)
             }
             .buttonStyle(.bordered)
-            .background(HotkeyCatcher(isRecording: $isRecording) { event in
-                shortcut = KeyboardShortcutSpec.from(flags: event.modifierFlags, keyCode: event.keyCode)
-                isRecording = false
-            })
+            .tint(isRecording ? .accentColor : nil)
         }
+        .background(
+            HotkeyCatcher(isRecording: $isRecording) { event in
+                handleRecordedKey(event)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        )
+        .onDisappear {
+            if isRecording { stopRecording() }
+        }
+    }
+
+    private func startRecording() {
+        recordHint = nil
+        appState.hotkeys.suspend()
+        isRecording = true
+    }
+
+    private func stopRecording() {
+        isRecording = false
+        appState.hotkeys.resume()
+    }
+
+    private func handleRecordedKey(_ event: NSEvent) {
+        if event.keyCode == 53 { // Escape cancels
+            stopRecording()
+            return
+        }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let hasModifier = flags.contains(.command)
+            || flags.contains(.option)
+            || flags.contains(.control)
+            || flags.contains(.shift)
+        guard hasModifier else {
+            recordHint = "Add ⌘ / ⌥ / ⌃ / ⇧"
+            return
+        }
+        shortcut = KeyboardShortcutSpec.from(flags: event.modifierFlags, keyCode: event.keyCode)
+        recordHint = nil
+        stopRecording()
     }
 }
 
@@ -713,33 +760,51 @@ struct HotkeyCatcher: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let view = nsView as? MonitorView else { return }
         view.onKey = onKey
-        view.isRecording = isRecording
+        if view.isRecording != isRecording {
+            view.isRecording = isRecording
+        }
     }
 
     final class MonitorView: NSView {
         var onKey: ((NSEvent) -> Void)?
-        private var monitor: Any?
+        private var localMonitor: Any?
         var isRecording: Bool = false {
             didSet { updateMonitor() }
         }
 
+        override var acceptsFirstResponder: Bool { true }
+
         private func updateMonitor() {
             clearMonitor()
             guard isRecording else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self else { return event }
+            window?.makeFirstResponder(self)
+            // Local monitor after Carbon hotkeys are suspended.
+            localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, self.isRecording else { return event }
                 let modifiersOnly: Set<UInt16> = [54, 55, 56, 58, 59, 60, 61, 62]
                 if modifiersOnly.contains(event.keyCode) { return nil }
-                self.onKey?(event)
+                DispatchQueue.main.async {
+                    self.onKey?(event)
+                }
                 return nil
             }
         }
 
         private func clearMonitor() {
-            if let monitor {
-                NSEvent.removeMonitor(monitor)
-                self.monitor = nil
+            if let localMonitor {
+                NSEvent.removeMonitor(localMonitor)
+                self.localMonitor = nil
             }
+        }
+
+        override func keyDown(with event: NSEvent) {
+            guard isRecording else {
+                super.keyDown(with: event)
+                return
+            }
+            let modifiersOnly: Set<UInt16> = [54, 55, 56, 58, 59, 60, 61, 62]
+            if modifiersOnly.contains(event.keyCode) { return }
+            onKey?(event)
         }
 
         override func viewWillMove(toWindow newWindow: NSWindow?) {

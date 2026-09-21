@@ -45,6 +45,15 @@ final class HotkeyManager {
         }
     }
 
+    /// Temporarily unregister global hotkeys so Settings can record a new shortcut.
+    func suspend() {
+        unregisterAll()
+    }
+
+    func resume() {
+        registerAll()
+    }
+
     private func installHandlerIfNeeded() {
         guard eventHandler == nil else { return }
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
