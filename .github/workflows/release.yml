@@ -109,6 +109,7 @@ jobs:
           tmp="$(mktemp -d)"
           gh repo clone AR-1106/homebrew-tap "$tmp/tap"
           cd "$tmp/tap"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/AR-1106/homebrew-tap.git"
 
           python3 - <<'PY'
           import os
