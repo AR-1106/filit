@@ -32,6 +32,15 @@ final class AppState: NSObject, ObservableObject {
             .environmentObject(appState)
     }
 
+    lazy var onboardingPanel = FloatingPanelController(
+        title: "Welcome to Filit",
+        size: NSSize(width: 440, height: 560),
+        chrome: .borderlessRounded
+    ) { appState in
+        OnboardingView()
+            .environmentObject(appState)
+    }
+
     @Published var statusMessage: String?
     @Published var isSmartPasting = false
     @Published var lastError: String?
@@ -64,6 +73,9 @@ final class AppState: NSObject, ObservableObject {
         hotkeys.start()
         snippetExpander.start()
         refreshCostEstimate()
+        DispatchQueue.main.async { [weak self] in
+            self?.presentOnboardingIfNeeded()
+        }
     }
 
     func restartSnippetExpansion() {
@@ -155,6 +167,21 @@ final class AppState: NSObject, ObservableObject {
     func closeSettings() {
         settingsPanel.close()
     }
+
+    func presentOnboardingIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Self.onboardingKey) else { return }
+        closeClipboardHistory()
+        closeSettings()
+        onboardingPanel.attach(appState: self)
+        onboardingPanel.show(nearMouse: false)
+    }
+
+    func completeOnboarding() {
+        UserDefaults.standard.set(true, forKey: Self.onboardingKey)
+        onboardingPanel.close()
+    }
+
+    private static let onboardingKey = "hasCompletedOnboarding"
 
     func refreshCostEstimate() {
         let field = FieldContext(

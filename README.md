@@ -61,9 +61,11 @@ Or grab `Filit-0.1.0.zip` from [Releases](https://github.com/AR-1106/filit/relea
 
 ## First launch
 
-1. Grant **Accessibility** when macOS asks — or later in **System Settings → Privacy & Security → Accessibility**. Filit needs it to read the focused field and to insert text.
-2. Open **Filit → Settings** and save a [TypeSafe API key](https://typesafe.ai). It is stored in Keychain (`com.filit.app`), not in the repo.
-3. Copy something useful, click a field, press **⌥⌘V**.
+Homebrew opens Filit after install. A welcome window walks through:
+
+1. **Accessibility** — Allow Access so Filit can read the focused field and paste
+2. **TypeSafe API key** — paste it in and Save (stored in Keychain)
+3. **Get started** — then copy something useful, click a field, and press **⌥⌘V**
 
 Hotkeys are remappable in Settings.
 

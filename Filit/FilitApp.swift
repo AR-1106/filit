@@ -11,6 +11,7 @@ struct FilitApp: App {
                 .environmentObject(appState)
                 .onAppear {
                     appState.installURLHandler()
+                    appState.presentOnboardingIfNeeded()
                 }
         } label: {
             Image(systemName: FilitSymbol.name)

@@ -2,11 +2,10 @@
 import AppKit
 
 let symbolName = "clipboard"
-let canvas = 1024
-let fill = NSColor(srgbRed: 0.145, green: 0.275, blue: 0.365, alpha: 1)
+let fill = NSColor.black
 let cornerRatio: CGFloat = 0.223
 
-func drawIcon(pixels: Int) -> NSBitmapImageRep {
+func makeRep(pixels: Int) -> NSBitmapImageRep {
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil,
         pixelsWide: pixels,
@@ -20,47 +19,108 @@ func drawIcon(pixels: Int) -> NSBitmapImageRep {
         bitsPerPixel: 0
     )!
     rep.size = NSSize(width: pixels, height: pixels)
+    return rep
+}
 
+func withContext(_ rep: NSBitmapImageRep, _ body: () -> Void) {
     NSGraphicsContext.saveGraphicsState()
-    guard let ctx = NSGraphicsContext(bitmapImageRep: rep) else {
-        fatalError("No graphics context")
-    }
+    guard let ctx = NSGraphicsContext(bitmapImageRep: rep) else { fatalError("No graphics context") }
     NSGraphicsContext.current = ctx
     ctx.imageInterpolation = .high
     ctx.shouldAntialias = true
+    body()
+    NSGraphicsContext.restoreGraphicsState()
+}
 
-    let rect = NSRect(x: 0, y: 0, width: CGFloat(pixels), height: CGFloat(pixels))
-    NSColor.clear.setFill()
-    rect.fill()
-
-    let radius = CGFloat(pixels) * cornerRatio
-    let squircle = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: radius, yRadius: radius)
-    fill.setFill()
-    squircle.fill()
-
-    let pointSize = CGFloat(pixels) * 0.52
+func renderSymbol(pixels: Int) -> NSBitmapImageRep {
+    let pointSize = CGFloat(pixels) * 0.72
     let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
         .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
     guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
         .withSymbolConfiguration(config) else {
         fatalError("Missing SF Symbol \(symbolName)")
     }
+    let rep = makeRep(pixels: pixels)
+    withContext(rep) {
+        NSColor.clear.setFill()
+        NSRect(x: 0, y: 0, width: pixels, height: pixels).fill()
+        let size = symbol.size
+        let origin = NSPoint(
+            x: (CGFloat(pixels) - size.width) / 2,
+            y: (CGFloat(pixels) - size.height) / 2
+        )
+        symbol.draw(
+            in: NSRect(origin: origin, size: size),
+            from: .zero,
+            operation: .sourceOver,
+            fraction: 1,
+            respectFlipped: true,
+            hints: [.interpolation: NSNumber(value: NSImageInterpolation.high.rawValue)]
+        )
+    }
+    return rep
+}
 
-    let symbolSize = symbol.size
+func opaqueBounds(_ rep: NSBitmapImageRep) -> NSRect {
+    let w = rep.pixelsWide
+    let h = rep.pixelsHigh
+    var minX = w, minY = h, maxX = 0, maxY = 0
+    for y in 0..<h {
+        for x in 0..<w {
+            var pixel = [Int](repeating: 0, count: 4)
+            rep.getPixel(&pixel, atX: x, y: y)
+            guard pixel[3] > 24 else { continue }
+            minX = min(minX, x)
+            minY = min(minY, y)
+            maxX = max(maxX, x)
+            maxY = max(maxY, y)
+        }
+    }
+    if maxX < minX { return NSRect(x: 0, y: 0, width: w, height: h) }
+    return NSRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+}
+
+func drawIcon(pixels: Int) -> NSBitmapImageRep {
+    let symbolRep = renderSymbol(pixels: pixels * 2)
+    let bounds = opaqueBounds(symbolRep)
+    let target = CGFloat(pixels) * 0.54
+    let scale = min(target / bounds.width, target / bounds.height)
+    let drawSize = NSSize(width: bounds.width * scale, height: bounds.height * scale)
     let origin = NSPoint(
-        x: (CGFloat(pixels) - symbolSize.width) / 2,
-        y: (CGFloat(pixels) - symbolSize.height) / 2 - CGFloat(pixels) * 0.01
-    )
-    symbol.draw(
-        in: NSRect(origin: origin, size: symbolSize),
-        from: .zero,
-        operation: .sourceOver,
-        fraction: 1,
-        respectFlipped: true,
-        hints: [.interpolation: NSNumber(value: NSImageInterpolation.high.rawValue)]
+        x: (CGFloat(pixels) - drawSize.width) / 2,
+        y: (CGFloat(pixels) - drawSize.height) / 2
     )
 
-    NSGraphicsContext.restoreGraphicsState()
+    let rep = makeRep(pixels: pixels)
+    withContext(rep) {
+        let rect = NSRect(x: 0, y: 0, width: pixels, height: pixels)
+        NSColor.clear.setFill()
+        rect.fill()
+
+        let radius = CGFloat(pixels) * cornerRatio
+        let squircle = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: radius, yRadius: radius)
+        fill.setFill()
+        squircle.fill()
+
+        guard let cg = symbolRep.cgImage else { return }
+        let cropped = cg.cropping(to: CGRect(
+            x: bounds.origin.x,
+            y: bounds.origin.y,
+            width: bounds.width,
+            height: bounds.height
+        ))
+        if let cropped {
+            let image = NSImage(cgImage: cropped, size: drawSize)
+            image.draw(
+                in: NSRect(origin: origin, size: drawSize),
+                from: .zero,
+                operation: .sourceOver,
+                fraction: 1,
+                respectFlipped: true,
+                hints: [.interpolation: NSNumber(value: NSImageInterpolation.high.rawValue)]
+            )
+        }
+    }
     return rep
 }
 
@@ -111,7 +171,5 @@ process.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
 process.arguments = ["-c", "icns", iconset.path, "-o", icns.path]
 try! process.run()
 process.waitUntilExit()
-guard process.terminationStatus == 0 else {
-    fatalError("iconutil failed")
-}
+guard process.terminationStatus == 0 else { fatalError("iconutil failed") }
 print("wrote \(icns.path)")

@@ -28,6 +28,7 @@
 		CEACF0E14C4B07A7F5E2B025 /* FilitGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = E41494EAE40F5203024738D7 /* FilitGlass.swift */; };
 		D38EB30F7483CA848FB6B7DD /* FilitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 810F45C4589E3EAB99846280 /* FilitApp.swift */; };
 		DCB7A8939E2DD2C377129D20 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614842544856F947E6336C2F /* KeychainStore.swift */; };
+		EAF91AF98C467DC4FBDC7DFC /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 933E3F1139AC835F90174FEB /* OnboardingView.swift */; };
 		F6764FBA139590768E9452D3 /* PasteInserter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F9FD331EEC864309555D2EB /* PasteInserter.swift */; };
 		F9D9EB9BCE6ECF2426277A94 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FE00DC26B88E7E9BD78349E /* AppState.swift */; };
 /* End PBXBuildFile section */
@@ -50,6 +51,7 @@
 		8F9FD331EEC864309555D2EB /* PasteInserter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteInserter.swift; sourceTree = "<group>"; };
 		8FADD3E846E389C3CFB40EA8 /* SourceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceStore.swift; sourceTree = "<group>"; };
 		90116FADE6B8D71F44341B1A /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
+		933E3F1139AC835F90174FEB /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		AF810052CFDBCD2BEEE068CC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B00B9BEC8FBBBD333D48F1AC /* TypeSafeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypeSafeClient.swift; sourceTree = "<group>"; };
 		B1AA617541CF9E7D951621B1 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
@@ -176,6 +178,7 @@
 				21900DCF4466149F494B5B5E /* FilitSymbol.swift */,
 				F58F5151301ECC8D539687BA /* FloatingPanelController.swift */,
 				D8354CA8A95132C4CD783741 /* ItemPreviewPopover.swift */,
+				933E3F1139AC835F90174FEB /* OnboardingView.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -304,6 +307,7 @@
 				C766B866324F288D79667434 /* ItemPreviewPopover.swift in Sources */,
 				DCB7A8939E2DD2C377129D20 /* KeychainStore.swift in Sources */,
 				50E6E51125DEE29167B707F1 /* MenuBarView.swift in Sources */,
+				EAF91AF98C467DC4FBDC7DFC /* OnboardingView.swift in Sources */,
 				A8A9AEDDCE8EC7E8584DB534 /* PasteCost.swift in Sources */,
 				F6764FBA139590768E9452D3 /* PasteInserter.swift in Sources */,
 				0513882B31A8EE25665C79E4 /* SettingsView.swift in Sources */,
