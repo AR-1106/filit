@@ -25,6 +25,10 @@ struct FilitLauncherView: View {
     @State private var editingSnippet: Snippet?
     @State private var isKeyboardNavigating = true
     @State private var pendingHoverID: UUID?
+    @State private var previewID: UUID?
+    @State private var hoveredID: UUID?
+    @State private var hoverEnabled = false
+    @State private var hoverPreviewTask: Task<Void, Never>?
     @State private var previewEdge: Edge = .trailing
     @State private var showSnippetEditor = false
     @FocusState private var searchFocused: Bool
@@ -88,20 +92,29 @@ struct FilitLauncherView: View {
         .onAppear {
             DispatchQueue.main.async { searchFocused = true }
             isKeyboardNavigating = true
+            hoverEnabled = false
+            dismissPreview()
             selectFirst()
             updatePreviewEdge()
+        }
+        .onDisappear {
+            dismissPreview()
         }
         .onChange(of: mode) { _, _ in
             query = ""
             pendingHoverID = nil
             isKeyboardNavigating = true
+            hoverEnabled = false
+            dismissPreview()
             selectFirst()
         }
         .onChange(of: query) { _, _ in
+            hoverEnabled = false
+            dismissPreview()
             pruneOrReselect()
         }
         .background(KeyCatcher { key in handleKey(key) })
-        .background(MouseMoveCatcher { exitKeyboardNavigation() })
+        .background(MouseMoveCatcher { armHoverFromMouse() })
         .background(WindowAccess { window in
             previewEdge = PreviewEdgeHelper.arrowEdge(for: window)
         })
@@ -253,14 +266,12 @@ struct FilitLauncherView: View {
             }
         }
         .onHover { hovering in
-            if hovering {
-                hoverSelect(id: item.id)
-            }
+            handleHover(item.id, hovering: hovering)
         }
         .popover(
             isPresented: Binding(
-                get: { isSelected && mode == .history },
-                set: { _ in }
+                get: { previewID == item.id && mode == .history },
+                set: { if !$0, previewID == item.id { previewID = nil } }
             ),
             attachmentAnchor: .rect(.bounds),
             arrowEdge: previewEdge
@@ -314,14 +325,12 @@ struct FilitLauncherView: View {
             }
         }
         .onHover { hovering in
-            if hovering {
-                hoverSelect(id: snippet.id)
-            }
+            handleHover(snippet.id, hovering: hovering)
         }
         .popover(
             isPresented: Binding(
-                get: { isSelected && mode == .snippets && !showSnippetEditor },
-                set: { _ in }
+                get: { previewID == snippet.id && mode == .snippets && !showSnippetEditor },
+                set: { if !$0, previewID == snippet.id { previewID = nil } }
             ),
             attachmentAnchor: .rect(.bounds),
             arrowEdge: previewEdge
@@ -463,6 +472,34 @@ struct FilitLauncherView: View {
         return sections
     }
 
+    private func handleHover(_ id: UUID, hovering: Bool) {
+        if !hovering {
+            if hoveredID == id { hoveredID = nil }
+            if pendingHoverID == id { pendingHoverID = nil }
+            hoverPreviewTask?.cancel()
+            hoverPreviewTask = nil
+            if previewID == id { previewID = nil }
+            return
+        }
+        pendingHoverID = id
+        guard hoverEnabled else { return }
+        hoveredID = id
+        hoverSelect(id: id)
+        hoverPreviewTask?.cancel()
+        hoverPreviewTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(320))
+            guard !Task.isCancelled, hoveredID == id, hoverEnabled else { return }
+            previewID = id
+        }
+    }
+
+    private func dismissPreview() {
+        hoverPreviewTask?.cancel()
+        hoverPreviewTask = nil
+        hoveredID = nil
+        previewID = nil
+    }
+
     private func hoverSelect(id: UUID) {
         if isKeyboardNavigating {
             pendingHoverID = id
@@ -471,12 +508,17 @@ struct FilitLauncherView: View {
         applySelection(id: id)
     }
 
-    private func exitKeyboardNavigation() {
-        guard isKeyboardNavigating else { return }
-        isKeyboardNavigating = false
+    private func armHoverFromMouse() {
+        let wasEnabled = hoverEnabled
+        hoverEnabled = true
+        if isKeyboardNavigating {
+            isKeyboardNavigating = false
+        }
         if let pending = pendingHoverID {
-            pendingHoverID = nil
             applySelection(id: pending)
+            if !wasEnabled {
+                handleHover(pending, hovering: true)
+            }
         }
     }
 
@@ -556,6 +598,8 @@ struct FilitLauncherView: View {
     private func moveSelection(_ delta: Int) {
         isKeyboardNavigating = true
         pendingHoverID = nil
+        hoverEnabled = false
+        dismissPreview()
         switch mode {
         case .history:
             guard !historyItems.isEmpty else { return }
@@ -733,7 +777,15 @@ struct MouseMoveCatcher: NSViewRepresentable {
             monitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
                 guard let self, self.window?.isKeyWindow == true else { return event }
                 let loc = event.locationInWindow
-                if let last = self.lastLocation, last == loc { return event }
+                if let last = self.lastLocation {
+                    let dx = loc.x - last.x
+                    let dy = loc.y - last.y
+                    if (dx * dx + dy * dy) < 36 { return event }
+                } else {
+                    // First event is often synthetic when the window becomes key.
+                    self.lastLocation = loc
+                    return event
+                }
                 self.lastLocation = loc
                 self.onMove?()
                 return event
