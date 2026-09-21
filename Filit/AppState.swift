@@ -17,7 +17,8 @@ final class AppState: NSObject, ObservableObject {
     lazy var historyPanel = FloatingPanelController(
         title: "Filit",
         size: NSSize(width: 420, height: 520),
-        chrome: .borderlessRounded
+        chrome: .borderlessRounded,
+        activatesApplication: false
     ) { appState in
         FilitLauncherView()
             .environmentObject(appState)
@@ -49,6 +50,10 @@ final class AppState: NSObject, ObservableObject {
     @Published var lastCandidateCount: Int = 0
     @Published var estimatedNextPaste: TokenUsage?
 
+    /// App that was frontmost before Filit — paste from the launcher returns here.
+    private(set) var pasteTargetApp: NSRunningApplication?
+    private var frontAppObserver: NSObjectProtocol?
+
     private var cancellables = Set<AnyCancellable>()
 
     override init() {
@@ -76,10 +81,66 @@ final class AppState: NSObject, ObservableObject {
         bindHotkeys()
         hotkeys.start()
         snippetExpander.start()
+        trackFrontmostApp()
         refreshCostEstimate()
         DispatchQueue.main.async { [weak self] in
             self?.presentOnboardingIfNeeded()
         }
+    }
+
+    private func trackFrontmostApp() {
+        if let front = NSWorkspace.shared.frontmostApplication,
+           front.bundleIdentifier != Bundle.main.bundleIdentifier {
+            pasteTargetApp = front
+        }
+        frontAppObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+                return
+            }
+            Task { @MainActor in
+                guard let self else { return }
+                if app.bundleIdentifier != Bundle.main.bundleIdentifier {
+                    self.pasteTargetApp = app
+                }
+            }
+        }
+    }
+
+    /// Close the launcher, restore the previous app, then ⌘V what is on the pasteboard.
+    func pasteClipboardIntoPreviousApp() async {
+        closeClipboardHistory()
+        let target = pasteTargetApp
+        if let target, !target.isTerminated {
+            target.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+            for _ in 0..<25 {
+                if NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier {
+                    break
+                }
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            try? await Task.sleep(for: .milliseconds(40))
+            try? pasteInserter.pasteCommandV(toPid: target.processIdentifier)
+        } else {
+            try? pasteInserter.pasteCommandV()
+        }
+    }
+
+    func pasteHistoryItem(_ item: ClipboardItem) async {
+        clipboard.copyToPasteboard(item)
+        await pasteClipboardIntoPreviousApp()
+    }
+
+    func pasteSnippetItem(_ snippet: Snippet) async {
+        let text = snippet.text
+        guard !text.isEmpty else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+        await pasteClipboardIntoPreviousApp()
     }
 
     func restartSnippetExpansion() {

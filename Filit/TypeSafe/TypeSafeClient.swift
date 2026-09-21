@@ -66,7 +66,7 @@ final class TypeSafeClient: @unchecked Sendable {
                     "type": "choice",
                     "instructions": [
                         "question": "Which candidate value belongs in the focused field?",
-                        "guidance": "Use `field` label, placeholder, and nearby text to decide. Prefer verbatim `candidates` values. Choose none if nothing fits.",
+                        "guidance": "Use `field` label, placeholder, and nearby text to decide. Prefer verbatim `candidates` values. When a candidate origin starts with `history-latest` and fits the field, prefer it over snippets. Choose none if nothing fits.",
                     ],
                     "criteria": criteria,
                 ] as [String: Any],

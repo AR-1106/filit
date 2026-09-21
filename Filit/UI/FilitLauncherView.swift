@@ -602,20 +602,15 @@ struct FilitLauncherView: View {
     }
 
     private func pasteHistory(_ item: ClipboardItem) {
-        appState.closeClipboardHistory()
-        switch item.kind {
-        case .text:
-            appState.clipboard.copyToPasteboard(item)
-            try? appState.pasteInserter.insert(item.plainText)
-        case .richText, .image, .file, .color:
-            appState.clipboard.copyToPasteboard(item)
-            try? appState.pasteInserter.pasteCommandV()
+        Task { @MainActor in
+            await appState.pasteHistoryItem(item)
         }
     }
 
     private func pasteSnippet(_ snippet: Snippet) {
-        appState.closeClipboardHistory()
-        try? appState.pasteInserter.insert(snippet.text)
+        Task { @MainActor in
+            await appState.pasteSnippetItem(snippet)
+        }
     }
 
     private func handleKey(_ key: KeyCatcher.Key) {
