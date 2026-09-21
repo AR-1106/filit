@@ -427,6 +427,12 @@ struct SettingsView: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
+                if !snippet.includeInSmartPaste {
+                    Image(systemName: "eye.slash")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                        .help("Excluded from Smart Paste")
+                }
                 if !snippet.displayKeyword.isEmpty {
                     Text(snippet.displayKeyword)
                         .font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -436,6 +442,7 @@ struct SettingsView: View {
             .padding(.vertical, 12)
             .padding(.horizontal, 10)
             .frame(minHeight: 44)
+            .opacity(snippet.includeInSmartPaste ? 1 : 0.72)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.clear)
@@ -606,9 +613,23 @@ struct SnippetQuickEditor: View {
             labeled("Keyword") {
                 subtleTextField("!hello or /sig", text: $snippet.keyword)
             }
-            Text("Type the keyword anywhere — it expands instantly. Placeholders: {clipboard}, {date}, {time}, {uuid}.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+
+            HStack {
+                Text("Include in Smart Paste")
+                    .font(.system(size: 13))
+                Spacer()
+                Toggle("", isOn: $snippet.includeInSmartPaste)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(FilitGlass.elevatedFill)
+            )
 
             HStack(spacing: 10) {
                 Button("Save") { onSave(snippet) }

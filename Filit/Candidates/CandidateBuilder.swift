@@ -53,7 +53,8 @@ enum CandidateBuilder {
         }
 
         if settings.alwaysIncludeSnippets {
-            let ranked = rankSnippets(snippets, field: field)
+            let eligible = snippets.filter(\.includeInSmartPaste)
+            let ranked = rankSnippets(eligible, field: field)
             for snippet in ranked {
                 add(snippet.text, origin: "snippet:\(snippet.name)")
             }
