@@ -111,17 +111,23 @@ final class FloatingPanelController {
     }
 
     private func position(_ panel: NSPanel, nearMouse: Bool) {
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
+        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
+
         if nearMouse {
-            let mouse = NSEvent.mouseLocation
-            let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
-            let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
             var origin = NSPoint(x: mouse.x + 14, y: mouse.y - size.height - 14)
             origin.x = min(max(origin.x, visible.minX + 10), visible.maxX - size.width - 10)
             origin.y = min(max(origin.y, visible.minY + 10), visible.maxY - size.height - 10)
             panel.setFrame(NSRect(origin: origin, size: size), display: true)
-        } else if panel.frame.origin == .zero || !panel.isVisible {
-            panel.center()
+            return
         }
+
+        let origin = NSPoint(
+            x: visible.midX - size.width / 2,
+            y: visible.midY - size.height / 2
+        )
+        panel.setFrame(NSRect(origin: origin, size: size), display: true)
     }
 
     private func installKeyMonitor() {
