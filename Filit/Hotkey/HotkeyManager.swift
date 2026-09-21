@@ -46,11 +46,15 @@ final class HotkeyManager {
     }
 
     /// Temporarily unregister global hotkeys so Settings can record a new shortcut.
+    private var isSuspended = false
+
     func suspend() {
+        isSuspended = true
         unregisterAll()
     }
 
     func resume() {
+        isSuspended = false
         registerAll()
     }
 
@@ -91,6 +95,7 @@ final class HotkeyManager {
 
     private func registerAll() {
         unregisterAll()
+        guard !isSuspended else { return }
         register(settings.smartPasteShortcut, id: smartPasteID, ref: &smartPasteHotKeyRef)
         register(settings.historyShortcut, id: historyID, ref: &historyHotKeyRef)
     }

@@ -234,6 +234,8 @@ final class AppState: NSObject, ObservableObject {
 
     func closeSettings() {
         settingsPanel.close()
+        // Shortcut recording may have suspended Carbon hotkeys — always restore.
+        hotkeys.resume()
     }
 
     func presentOnboardingIfNeeded() {
@@ -247,6 +249,7 @@ final class AppState: NSObject, ObservableObject {
     func completeOnboarding() {
         UserDefaults.standard.set(true, forKey: Self.onboardingKey)
         onboardingPanel.close()
+        hotkeys.resume()
     }
 
     private static let onboardingKey = "hasCompletedOnboarding"
@@ -281,6 +284,9 @@ final class AppState: NSObject, ObservableObject {
         lastError = nil
         defer { isSmartPasting = false }
 
+        // Recording in Settings can leave hotkeys unregistered — heal that first.
+        hotkeys.resume()
+
         guard keychain.apiKey != nil else {
             lastError = "Add your TypeSafe API key in Settings"
             openSettings()
@@ -292,7 +298,17 @@ final class AppState: NSObject, ObservableObject {
             return
         }
 
+        // Capture destination before Filit does anything that could steal focus.
+        let targetApp: NSRunningApplication? = {
+            if let front = NSWorkspace.shared.frontmostApplication,
+               front.bundleIdentifier != Bundle.main.bundleIdentifier {
+                return front
+            }
+            return pasteTargetApp
+        }()
+        let targetElement = AccessibilityFieldReader.focusedElement()
         let field = AccessibilityFieldReader.focusedField()
+
         let candidates = CandidateBuilder.build(
             settings: settings,
             pinnedSource: source.pinnedText,
@@ -330,7 +346,21 @@ final class AppState: NSObject, ObservableObject {
                 lastError = "Unexpected choice from TypeSafe"
                 return
             }
-            try pasteInserter.insert(value)
+
+            if let targetElement, AccessibilityFieldReader.insertText(value, into: targetElement) {
+                statusMessage = "Pasted · \(result.usage.costDescription)"
+                return
+            }
+
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.setString(value, forType: .string)
+            if let targetApp, !targetApp.isTerminated {
+                pasteTargetApp = targetApp
+                await pasteClipboardIntoPreviousApp()
+            } else {
+                try pasteInserter.insert(value)
+            }
             statusMessage = "Pasted · \(result.usage.costDescription)"
         } catch {
             lastError = error.localizedDescription
