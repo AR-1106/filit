@@ -1,5 +1,5 @@
 import Foundation
 
 enum FilitSymbol {
-    static let name = "clipboard.fill"
+    static let name = "clipboard"
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env swift
 import AppKit
 
-let symbolName = "clipboard.fill"
+let symbolName = "clipboard"
 let canvas = 1024
-let fill = NSColor(srgbRed: 0.145, green: 0.275, blue: 0.365, alpha: 1) // ink
+let fill = NSColor(srgbRed: 0.145, green: 0.275, blue: 0.365, alpha: 1)
 let cornerRatio: CGFloat = 0.223
 
 func drawIcon(pixels: Int) -> NSBitmapImageRep {
@@ -38,8 +38,8 @@ func drawIcon(pixels: Int) -> NSBitmapImageRep {
     fill.setFill()
     squircle.fill()
 
-    let pointSize = CGFloat(pixels) * 0.48
-    let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .medium)
+    let pointSize = CGFloat(pixels) * 0.52
+    let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
         .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
     guard let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
         .withSymbolConfiguration(config) else {
@@ -68,19 +68,23 @@ func writePNG(_ rep: NSBitmapImageRep, to url: URL) {
     guard let data = rep.representation(using: .png, properties: [:]) else {
         fatalError("PNG encode failed")
     }
+    try! FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     try! data.write(to: url)
 }
 
 let root = URL(fileURLWithPath: CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
     : FileManager.default.currentDirectoryPath)
-let iconset = root.appendingPathComponent("Filit/Assets.xcassets/AppIcon.appiconset")
+let catalog = root.appendingPathComponent("Filit/Assets.xcassets/AppIcon.appiconset")
+let iconset = root.appendingPathComponent("build/Filit.iconset")
 let docs = root.appendingPathComponent("docs")
+let resources = root.appendingPathComponent("Filit/Resources")
+try! FileManager.default.createDirectory(at: catalog, withIntermediateDirectories: true)
 try! FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
 try! FileManager.default.createDirectory(at: docs, withIntermediateDirectories: true)
+try! FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
 
-let master = drawIcon(pixels: 1024)
-writePNG(master, to: docs.appendingPathComponent("icon.png"))
+writePNG(drawIcon(pixels: 1024), to: docs.appendingPathComponent("app-icon.png"))
 
 let sizes: [(String, Int)] = [
     ("icon_16x16.png", 16),
@@ -95,6 +99,19 @@ let sizes: [(String, Int)] = [
     ("icon_512x512@2x.png", 1024),
 ]
 for (name, px) in sizes {
-    writePNG(drawIcon(pixels: px), to: iconset.appendingPathComponent(name))
+    let image = drawIcon(pixels: px)
+    writePNG(image, to: catalog.appendingPathComponent(name))
+    writePNG(image, to: iconset.appendingPathComponent(name))
     print("wrote \(name)")
 }
+
+let icns = resources.appendingPathComponent("AppIcon.icns")
+let process = Process()
+process.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
+process.arguments = ["-c", "icns", iconset.path, "-o", icns.path]
+try! process.run()
+process.waitUntilExit()
+guard process.terminationStatus == 0 else {
+    fatalError("iconutil failed")
+}
+print("wrote \(icns.path)")

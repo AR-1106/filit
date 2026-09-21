@@ -16,6 +16,7 @@
 		865C715A65956CE4EF9019F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1D1437DE2897CE28CF7F8A8B /* Assets.xcassets */; };
 		89429EE064446B18FA4A2A5D /* ClipboardHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ABD73A4F9847D2CB2FC04FC /* ClipboardHistoryStore.swift */; };
 		8C63EB60A4D7CEB2721CFF16 /* SnippetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 828CCE3DE29C9894E3EC54BD /* SnippetStore.swift */; };
+		924828CD6AE222B6889DEFCF /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 1084E53EF5D9873B161ADDD4 /* AppIcon.icns */; };
 		97DE7CA9D756EA35592281E0 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6CCC638A687B61860C37C4 /* AppSettings.swift */; };
 		985C23B8F871866E12EA67FB /* FilitLauncherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27C0A1BC2DB0825391F7594B /* FilitLauncherView.swift */; };
 		9A4148B444D6059F78A969B9 /* FloatingPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58F5151301ECC8D539687BA /* FloatingPanelController.swift */; };
@@ -32,6 +33,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		1084E53EF5D9873B161ADDD4 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		108DB9BF6DB24FD1D64840DB /* PasteCost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteCost.swift; sourceTree = "<group>"; };
 		115454D279926FE8F1CF32A6 /* SnippetKeywordExpander.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetKeywordExpander.swift; sourceTree = "<group>"; };
 		1D1437DE2897CE28CF7F8A8B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -139,6 +141,7 @@
 				19B85A23441E865DF8D30D5B /* Clipboard */,
 				D53D414A5710F0347C04F9BF /* Hotkey */,
 				85008ABBC03319237F82AE61 /* Paste */,
+				FEB2BBE084D9F98A9C08652A /* Resources */,
 				15FBA1DCF651B61B7D91D7C7 /* Settings */,
 				AC246ADD1888A6CB65F5DDB3 /* Snippets */,
 				1770CEBA6BF737F44B851F6E /* TypeSafe */,
@@ -185,6 +188,14 @@
 			path = Hotkey;
 			sourceTree = "<group>";
 		};
+		FEB2BBE084D9F98A9C08652A /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				1084E53EF5D9873B161ADDD4 /* AppIcon.icns */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -194,6 +205,7 @@
 			buildPhases = (
 				0647A2C7648C4500418C5DEE /* Sources */,
 				9F3B0EF666054CE4BE96EC92 /* Resources */,
+				0273EF894B9A69CE46687D04 /* Embed full AppIcon.icns */,
 			);
 			buildRules = (
 			);
@@ -244,11 +256,34 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				924828CD6AE222B6889DEFCF /* AppIcon.icns in Resources */,
 				865C715A65956CE4EF9019F0 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		0273EF894B9A69CE46687D04 /* Embed full AppIcon.icns */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed full AppIcon.icns";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nSRC=\"${SRCROOT}/Filit/Resources/AppIcon.icns\"\nDST=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppIcon.icns\"\ncp \"$SRC\" \"$DST\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0647A2C7648C4500418C5DEE /* Sources */ = {

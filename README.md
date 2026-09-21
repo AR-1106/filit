@@ -1,6 +1,6 @@
 # Filit
 
-<img src="docs/icon.png" width="128" alt="Filit">
+<img src="docs/app-icon.png" width="128" alt="Filit">
 
 Filit is a macOS menu bar app that pastes the *right* value into the field you are sitting in.
 
