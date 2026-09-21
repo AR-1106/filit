@@ -63,7 +63,11 @@ final class AppState: NSObject, ObservableObject {
         self.pasteInserter = PasteInserter()
         self.typeSafe = TypeSafeClient(keychain: keychain)
         self.hotkeys = HotkeyManager(settings: settings)
-        self.snippetExpander = SnippetKeywordExpander(snippets: snippets, pasteInserter: pasteInserter)
+        self.snippetExpander = SnippetKeywordExpander(
+            snippets: snippets,
+            pasteInserter: pasteInserter,
+            clipboard: clipboard
+        )
         self.hasSavedAPIKey = keychain.apiKey != nil
 
         super.init()
