@@ -25,13 +25,56 @@ final class PasteInserter {
         try pasteViaClipboard(text)
     }
 
-    /// Insert at the caret without replacing the whole field (keyword expansion).
-    func insertAtCaret(_ text: String) throws {
+    /// Type at the caret. Does not use or change the clipboard.
+    func typeAtCaret(_ text: String, syntheticTag: Int64) throws {
         guard !text.isEmpty else { throw PasteError.empty }
-        if setAXSelectedText(text) {
-            return
+
+        let source = CGEventSource(stateID: .hidSystemState)
+        source?.localEventsSuppressionInterval = 0
+
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let lines = normalized.split(separator: "\n", omittingEmptySubsequences: false)
+
+        for (index, line) in lines.enumerated() {
+            postUnicodeChunks(String(line), source: source, tag: syntheticTag)
+            if index < lines.count - 1 {
+                postKey(36, source: source, tag: syntheticTag)
+            }
         }
-        try pasteViaClipboard(text)
+    }
+
+    private func postUnicodeChunks(_ text: String, source: CGEventSource?, tag: Int64) {
+        let units = Array(text.utf16)
+        guard !units.isEmpty else { return }
+        let chunkSize = 16
+        var start = 0
+        while start < units.count {
+            let end = min(start + chunkSize, units.count)
+            var chunk = Array(units[start..<end])
+            chunk.withUnsafeMutableBufferPointer { buf in
+                guard let base = buf.baseAddress else { return }
+                let down = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
+                let up = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+                down?.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: base)
+                up?.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: base)
+                down?.setIntegerValueField(.eventSourceUserData, value: tag)
+                up?.setIntegerValueField(.eventSourceUserData, value: tag)
+                down?.post(tap: .cghidEventTap)
+                up?.post(tap: .cghidEventTap)
+            }
+            start = end
+        }
+    }
+
+    private func postKey(_ key: CGKeyCode, source: CGEventSource?, tag: Int64) {
+        let down = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: true)
+        let up = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: false)
+        down?.setIntegerValueField(.eventSourceUserData, value: tag)
+        up?.setIntegerValueField(.eventSourceUserData, value: tag)
+        down?.post(tap: .cghidEventTap)
+        up?.post(tap: .cghidEventTap)
     }
 
     private func pasteViaClipboard(_ text: String) throws {

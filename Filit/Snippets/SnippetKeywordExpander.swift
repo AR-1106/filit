@@ -373,8 +373,8 @@ final class SnippetKeywordExpander {
         guard !expanded.isEmpty else { return }
 
         postDeletes(count: match.deletionCount)
-        try? await Task.sleep(for: .milliseconds(30))
-        try? pasteInserter.insertAtCaret(expanded)
+        try? await Task.sleep(for: .milliseconds(50))
+        try? pasteInserter.typeAtCaret(expanded, syntheticTag: Self.syntheticTag)
     }
 
     private func postDeletes(count: Int) {
