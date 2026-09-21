@@ -61,7 +61,7 @@ Or grab `Filit-0.1.0.zip` from [Releases](https://github.com/AR-1106/filit/relea
 
 ## First launch
 
-Homebrew opens Filit after install. A welcome window walks through:
+Open Filit from Applications or Spotlight. A welcome window walks through:
 
 1. **Accessibility** — Allow Access so Filit can read the focused field and paste
 2. **TypeSafe API key** — paste it in and Save (stored in Keychain)
