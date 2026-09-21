@@ -37,15 +37,31 @@ enum AccessibilityFieldReader {
         AXIsProcessTrusted()
     }
 
-    static func focusedField() -> FieldContext {
+    static func focusedElement() -> AXUIElement? {
         let system = AXUIElementCreateSystemWide()
         var focusedRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-              let focused = focusedRef else {
+              let focusedRef else { return nil }
+        return (focusedRef as! AXUIElement)
+    }
+
+    @discardableResult
+    static func insertText(_ text: String, into element: AXUIElement) -> Bool {
+        if AXUIElementSetAttributeValue(element, kAXSelectedTextAttribute as CFString, text as CFTypeRef) == .success {
+            return true
+        }
+        var settable: DarwinBoolean = false
+        if AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue {
+            return AXUIElementSetAttributeValue(element, kAXValueAttribute as CFString, text as CFTypeRef) == .success
+        }
+        return false
+    }
+
+    static func focusedField() -> FieldContext {
+        guard let element = focusedElement() else {
             return FieldContext(label: "", placeholder: "", role: "", description: "", value: "", nearby: "")
         }
 
-        let element = focused as! AXUIElement
         let label = firstString(element, [
             kAXTitleAttribute as String,
             kAXDescriptionAttribute as String,
