@@ -116,20 +116,21 @@ final class AppState: NSObject, ObservableObject {
     /// Close the launcher, restore the previous app, then ⌘V what is on the pasteboard.
     func pasteClipboardIntoPreviousApp() async {
         closeClipboardHistory()
+        closeSettings()
         let target = pasteTargetApp
         if let target, !target.isTerminated {
             target.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
-            for _ in 0..<25 {
+            for _ in 0..<40 {
                 if NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier {
                     break
                 }
-                try? await Task.sleep(for: .milliseconds(10))
+                try? await Task.sleep(for: .milliseconds(15))
             }
-            try? await Task.sleep(for: .milliseconds(40))
-            try? pasteInserter.pasteCommandV(toPid: target.processIdentifier)
-        } else {
-            try? pasteInserter.pasteCommandV()
+            // Let the target field accept key focus again before synthesizing ⌘V.
+            try? await Task.sleep(for: .milliseconds(80))
         }
+        // HID tap (not postToPid): many apps ignore synthetic ⌘V posted only to their PID.
+        try? pasteInserter.pasteCommandV()
     }
 
     func pasteHistoryItem(_ item: ClipboardItem) async {
@@ -306,7 +307,6 @@ final class AppState: NSObject, ObservableObject {
             }
             return pasteTargetApp
         }()
-        let targetElement = AccessibilityFieldReader.focusedElement()
         let field = AccessibilityFieldReader.focusedField()
 
         let candidates = CandidateBuilder.build(
@@ -347,20 +347,15 @@ final class AppState: NSObject, ObservableObject {
                 return
             }
 
-            if let targetElement, AccessibilityFieldReader.insertText(value, into: targetElement) {
-                statusMessage = "Pasted · \(result.usage.costDescription)"
-                return
-            }
-
+            // Don't trust AX "success" — Chromium/Electron often report success and insert nothing.
+            // Always restore the previous app and paste via the pasteboard + HID ⌘V.
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.setString(value, forType: .string)
             if let targetApp, !targetApp.isTerminated {
                 pasteTargetApp = targetApp
-                await pasteClipboardIntoPreviousApp()
-            } else {
-                try pasteInserter.insert(value)
             }
+            await pasteClipboardIntoPreviousApp()
             statusMessage = "Pasted · \(result.usage.costDescription)"
         } catch {
             lastError = error.localizedDescription
