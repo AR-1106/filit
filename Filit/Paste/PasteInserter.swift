@@ -77,6 +77,19 @@ final class PasteInserter {
         up?.post(tap: .cghidEventTap)
     }
 
+    /// Cmd+V after the caller has already restored the pasteboard.
+    func pasteCommandV() throws {
+        let source = CGEventSource(stateID: .hidSystemState)
+        let keyV: CGKeyCode = 9
+        let down = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: true)
+        let up = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: false)
+        down?.flags = .maskCommand
+        up?.flags = .maskCommand
+        guard down != nil, up != nil else { throw PasteError.failed }
+        down?.post(tap: .cghidEventTap)
+        up?.post(tap: .cghidEventTap)
+    }
+
     private func pasteViaClipboard(_ text: String) throws {
         let pb = NSPasteboard.general
         let previousString = pb.string(forType: .string)
@@ -84,14 +97,7 @@ final class PasteInserter {
         pb.clearContents()
         pb.setString(text, forType: .string)
 
-        let source = CGEventSource(stateID: .hidSystemState)
-        let keyV: CGKeyCode = 9
-        let down = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: true)
-        let up = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: false)
-        down?.flags = .maskCommand
-        up?.flags = .maskCommand
-        down?.post(tap: .cghidEventTap)
-        up?.post(tap: .cghidEventTap)
+        try pasteCommandV()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             guard pb.string(forType: .string) == text else { return }

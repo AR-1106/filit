@@ -29,7 +29,11 @@ TypeSafe / Jev pricing: **$0.042 per million input tokens**. Output is free. Typ
 
 ## Clipboard history
 
-**⌘⇧D** opens a searchable history of what you have copied. Hover or arrow through items for a preview, then paste into the focused field. History size is yours to set (default 200 on disk; 20 considered for smart paste).
+**⌘⇧D** opens a searchable history of what you have copied — plain text, rich text, images, files, and colors. Hover for a preview, then paste. History restores the original pasteboard formats (carbon copy), so an image pastes as an image.
+
+Smart paste only sends **text** candidates to TypeSafe. Images and files stay local and never go to Jev.
+
+History size is yours to set (default 200 on disk; 20 text items considered for smart paste). Transient / concealed pasteboard items (passwords) are ignored.
 
 ## Snippets
 

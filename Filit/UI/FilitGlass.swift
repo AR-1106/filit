@@ -41,6 +41,42 @@ struct ClipboardMeta {
     let subtitle: String
     let symbol: String
 
+    static func forItem(_ item: ClipboardItem) -> ClipboardMeta {
+        let time = item.createdAt.formatted(date: .omitted, time: .shortened)
+        switch item.kind {
+        case .image:
+            return ClipboardMeta(
+                kindLabel: "Image",
+                title: item.title,
+                subtitle: "Image · Copied \(time)",
+                symbol: "photo"
+            )
+        case .file:
+            return ClipboardMeta(
+                kindLabel: "File",
+                title: item.title,
+                subtitle: "File · Copied \(time)",
+                symbol: "doc"
+            )
+        case .color:
+            return ClipboardMeta(
+                kindLabel: "Color",
+                title: item.title,
+                subtitle: "Color · Copied \(time)",
+                symbol: "paintpalette"
+            )
+        case .richText:
+            return ClipboardMeta(
+                kindLabel: "Rich Text",
+                title: item.preview.replacingOccurrences(of: "\n", with: " "),
+                subtitle: "Rich Text · Copied \(time)",
+                symbol: "doc.richtext"
+            )
+        case .text:
+            return forText(item.plainText, copiedAt: item.createdAt)
+        }
+    }
+
     static func forText(_ text: String, copiedAt: Date) -> ClipboardMeta {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let time = copiedAt.formatted(date: .omitted, time: .shortened)

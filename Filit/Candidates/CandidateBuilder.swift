@@ -61,7 +61,7 @@ enum CandidateBuilder {
 
         if settings.includeClipboardHistory {
             let limit = max(0, settings.clipboardItemsForSmartPaste)
-            for item in history.prefix(limit) {
+            for item in history.prefix(limit) where item.isSmartPasteEligible {
                 // Prefer extracting spans from large history blobs
                 if item.text.count > 280 {
                     for email in matches(emailRegex, in: item.text) { add(email, origin: "history-email") }

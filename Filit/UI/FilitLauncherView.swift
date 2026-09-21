@@ -38,7 +38,11 @@ struct FilitLauncherView: View {
         let base = Array(appState.clipboard.items.prefix(limit))
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return base }
-        return base.filter { $0.text.lowercased().contains(q) }
+        return base.filter {
+            $0.title.lowercased().contains(q)
+                || $0.plainText.lowercased().contains(q)
+                || $0.kind.rawValue.lowercased().contains(q)
+        }
     }
 
     private var snippetItems: [Snippet] {
@@ -238,17 +242,18 @@ struct FilitLauncherView: View {
 
     private func historyRow(_ item: ClipboardItem) -> some View {
         let isSelected = item.id == selectedHistoryID
-        let meta = ClipboardMeta.forText(item.text, copiedAt: item.createdAt)
+        let meta = ClipboardMeta.forItem(item)
+        let thumbnail = item.kind == .image ? appState.clipboard.image(for: item) : nil
         return HStack(spacing: 12) {
-            Image(systemName: meta.symbol)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .frame(width: 22)
+            historyLeading(meta: meta, thumbnail: thumbnail, selected: isSelected)
             Text(item.preview)
                 .font(.system(size: 15, weight: .medium))
                 .lineLimit(1)
                 .foregroundStyle(.primary)
             Spacer(minLength: 0)
+            Text(meta.kindLabel)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
@@ -276,13 +281,19 @@ struct FilitLauncherView: View {
             attachmentAnchor: .rect(.bounds),
             arrowEdge: previewEdge
         ) {
-            ItemPreviewPopover.fromClipboardText(item.text, copiedAt: item.createdAt)
+            ItemPreviewPopover.fromClipboardItem(
+                item,
+                image: appState.clipboard.image(for: item),
+                files: appState.clipboard.fileURLs(for: item)
+            )
         }
         .contextMenu {
             Button("Paste") { pasteHistory(item) }
-            Button("Pin as Source") {
-                appState.source.pin(item.text)
-                appState.refreshCostEstimate()
+            if item.isSmartPasteEligible {
+                Button("Pin as Source") {
+                    appState.source.pin(item.plainText)
+                    appState.refreshCostEstimate()
+                }
             }
             Divider()
             Button("Delete", role: .destructive) {
@@ -290,6 +301,22 @@ struct FilitLauncherView: View {
             }
         }
         .animation(.easeOut(duration: 0.12), value: isSelected)
+    }
+
+    @ViewBuilder
+    private func historyLeading(meta: ClipboardMeta, thumbnail: NSImage?, selected: Bool) -> some View {
+        if let thumbnail {
+            Image(nsImage: thumbnail)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 22, height: 22)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        } else {
+            Image(systemName: meta.symbol)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(selected ? .primary : .secondary)
+                .frame(width: 22)
+        }
     }
 
     private func snippetRow(_ snippet: Snippet) -> some View {
@@ -568,9 +595,15 @@ struct FilitLauncherView: View {
     }
 
     private func pasteHistory(_ item: ClipboardItem) {
-        appState.clipboard.copyToPasteboard(item)
         appState.closeClipboardHistory()
-        try? appState.pasteInserter.insert(item.text)
+        switch item.kind {
+        case .text:
+            appState.clipboard.copyToPasteboard(item)
+            try? appState.pasteInserter.insert(item.plainText)
+        case .richText, .image, .file, .color:
+            appState.clipboard.copyToPasteboard(item)
+            try? appState.pasteInserter.pasteCommandV()
+        }
     }
 
     private func pasteSnippet(_ snippet: Snippet) {
