@@ -330,6 +330,12 @@ struct FilitLauncherView: View {
                 .font(.system(size: 15, weight: .medium))
                 .lineLimit(1)
             Spacer(minLength: 0)
+            if !snippet.includeInSmartPaste {
+                Image(systemName: "eye.slash")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .help("Excluded from Smart Paste")
+            }
             if !snippet.displayKeyword.isEmpty {
                 Text(snippet.displayKeyword)
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
@@ -339,6 +345,7 @@ struct FilitLauncherView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .frame(minHeight: 44)
+        .opacity(snippet.includeInSmartPaste ? 1 : 0.72)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.clear)
@@ -595,20 +602,15 @@ struct FilitLauncherView: View {
     }
 
     private func pasteHistory(_ item: ClipboardItem) {
-        appState.closeClipboardHistory()
-        switch item.kind {
-        case .text:
-            appState.clipboard.copyToPasteboard(item)
-            try? appState.pasteInserter.insert(item.plainText)
-        case .richText, .image, .file, .color:
-            appState.clipboard.copyToPasteboard(item)
-            try? appState.pasteInserter.pasteCommandV()
+        Task { @MainActor in
+            await appState.pasteHistoryItem(item)
         }
     }
 
     private func pasteSnippet(_ snippet: Snippet) {
-        appState.closeClipboardHistory()
-        try? appState.pasteInserter.insert(snippet.text)
+        Task { @MainActor in
+            await appState.pasteSnippetItem(snippet)
+        }
     }
 
     private func handleKey(_ key: KeyCatcher.Key) {
@@ -694,9 +696,22 @@ struct SnippetEditorView: View {
                     TextField("!hello or /sig", text: $snippet.keyword)
                         .textFieldStyle(.roundedBorder)
                 }
-                Text("Type the keyword anywhere to expand. Supports {clipboard}, {date}, {time}, {uuid}.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("Include in Smart Paste")
+                        .font(.system(size: 13))
+                    Spacer()
+                    Toggle("", isOn: $snippet.includeInSmartPaste)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(FilitGlass.elevatedFill)
+                )
                 Text("Content")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)

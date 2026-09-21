@@ -6,13 +6,37 @@ struct Snippet: Identifiable, Codable, Hashable {
     var keyword: String
     var text: String
     var tags: [String]
+    /// When false, keyword expansion still works but Smart Paste / Jev never sees this snippet.
+    var includeInSmartPaste: Bool
 
-    init(id: UUID = UUID(), name: String, keyword: String = "", text: String, tags: [String] = []) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        keyword: String = "",
+        text: String,
+        tags: [String] = [],
+        includeInSmartPaste: Bool = true
+    ) {
         self.id = id
         self.name = name
         self.keyword = keyword
         self.text = text
         self.tags = tags
+        self.includeInSmartPaste = includeInSmartPaste
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, keyword, text, tags, includeInSmartPaste
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        keyword = try container.decodeIfPresent(String.self, forKey: .keyword) ?? ""
+        text = try container.decode(String.self, forKey: .text)
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+        includeInSmartPaste = try container.decodeIfPresent(Bool.self, forKey: .includeInSmartPaste) ?? true
     }
 }
 
@@ -94,6 +118,7 @@ enum SnippetJSONImport {
         var content: String?
         var keyword: String?
         var tags: [String]?
+        var includeInSmartPaste: Bool?
     }
 
     struct Wrapper: Decodable {
@@ -117,6 +142,12 @@ enum SnippetJSONImport {
         let name = item.name ?? item.title ?? "Untitled"
         let text = item.text ?? item.content ?? ""
         guard !text.isEmpty else { return nil }
-        return Snippet(name: name, keyword: item.keyword ?? "", text: text, tags: item.tags ?? [])
+        return Snippet(
+            name: name,
+            keyword: item.keyword ?? "",
+            text: text,
+            tags: item.tags ?? [],
+            includeInSmartPaste: item.includeInSmartPaste ?? true
+        )
     }
 }

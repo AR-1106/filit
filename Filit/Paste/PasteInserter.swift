@@ -101,7 +101,7 @@ final class PasteInserter {
         up?.post(tap: .cghidEventTap)
     }
 
-    func pasteCommandV(syntheticTag: Int64? = nil) throws {
+    func pasteCommandV(syntheticTag: Int64? = nil, toPid pid: pid_t? = nil) throws {
         let source = CGEventSource(stateID: .combinedSessionState)
         let keyV: CGKeyCode = 9
         let down = CGEvent(keyboardEventSource: source, virtualKey: keyV, keyDown: true)
@@ -112,9 +112,14 @@ final class PasteInserter {
             down?.setIntegerValueField(.eventSourceUserData, value: syntheticTag)
             up?.setIntegerValueField(.eventSourceUserData, value: syntheticTag)
         }
-        guard down != nil, up != nil else { throw PasteError.failed }
-        down?.post(tap: .cghidEventTap)
-        up?.post(tap: .cghidEventTap)
+        guard let down, let up else { throw PasteError.failed }
+        if let pid {
+            down.postToPid(pid)
+            up.postToPid(pid)
+        } else {
+            down.post(tap: .cghidEventTap)
+            up.post(tap: .cghidEventTap)
+        }
     }
 
     private func pasteViaClipboard(_ text: String) throws {

@@ -13,6 +13,7 @@ final class FloatingPanelController {
     private weak var appState: AppState?
     private let size: NSSize
     private let chrome: PanelChrome
+    private let activatesApplication: Bool
     private let cornerRadius: CGFloat = 20
     private let builder: (AppState) -> AnyView
 
@@ -20,10 +21,12 @@ final class FloatingPanelController {
         title: String,
         size: NSSize,
         chrome: PanelChrome,
+        activatesApplication: Bool = true,
         @ViewBuilder content: @escaping (AppState) -> some View
     ) {
         self.size = size
         self.chrome = chrome
+        self.activatesApplication = activatesApplication
         self.builder = { appState in AnyView(content(appState)) }
         _ = title
     }
@@ -53,7 +56,9 @@ final class FloatingPanelController {
 
         guard let panel else { return }
         position(panel, nearMouse: nearMouse)
-        NSApp.activate(ignoringOtherApps: true)
+        if activatesApplication {
+            NSApp.activate(ignoringOtherApps: true)
+        }
         panel.makeKeyAndOrderFront(nil)
         installKeyMonitor()
     }
@@ -62,13 +67,16 @@ final class FloatingPanelController {
         let hosting = NSHostingController(rootView: root)
         configureHosting(hosting)
 
-        let style: NSWindow.StyleMask
+        var style: NSWindow.StyleMask
         switch chrome {
         case .borderlessRounded:
             style = [.borderless]
         case .titledSettings:
             // Titled + closable so traffic lights sit inside the window chrome.
             style = [.titled, .closable, .fullSizeContentView]
+        }
+        if !activatesApplication {
+            style.insert(.nonactivatingPanel)
         }
 
         let panel = KeyablePanel(
@@ -82,7 +90,7 @@ final class FloatingPanelController {
         panel.hidesOnDeactivate = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.level = .normal
+        panel.level = .floating
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         panel.hasShadow = true
         panel.isMovable = true
