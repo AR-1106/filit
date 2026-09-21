@@ -49,6 +49,67 @@ struct SnippetKeywordPolicy: Sendable {
         reset()
     }
 
+    mutating func evaluate(_ input: Input, at now: Date) -> Evaluation {
+        if case .ignored = input { return .pass }
+        if let lastInputAt, now.timeIntervalSince(lastInputAt) > Self.timeout {
+            reset()
+        }
+
+        switch input {
+        case .ignored:
+            return .pass
+        case .reset:
+            reset()
+            return .flushAndPass
+        case .deleteBackward:
+            lastInputAt = now
+            if !buffer.isEmpty { buffer.removeLast() }
+            return .dropLastHeld
+        case .text(let text):
+            lastInputAt = now
+            buffer.append(text)
+            if buffer.count > Self.maximumBufferLength {
+                buffer.removeFirst(buffer.count - Self.maximumBufferLength)
+            }
+        }
+
+        let normalizedBuffer = buffer.lowercased()
+        if let keyword = keywords.first(where: { normalizedBuffer.hasSuffix($0.value) }) {
+            reset()
+            return .match(Match(
+                snippetID: keyword.snippetID,
+                keyword: keyword.value,
+                deletionCount: keyword.deletionCount
+            ))
+        }
+        if isOpenPrefix(normalizedBuffer) {
+            return .hold
+        }
+        return .flushAndPass
+    }
+
+    func isOpenPrefix(_ buffer: String) -> Bool {
+        guard !buffer.isEmpty else { return false }
+        for keyword in keywords {
+            var index = buffer.startIndex
+            while index < buffer.endIndex {
+                if keyword.value.hasPrefix(buffer[index...]) {
+                    return true
+                }
+                index = buffer.index(after: index)
+            }
+        }
+        return false
+    }
+
+    enum Evaluation: Equatable {
+        case pass
+        case hold
+        case flushAndPass
+        case dropLastHeld
+        case match(Match)
+    }
+
     mutating func process(_ input: Input, at now: Date) -> Match? {
         if case .ignored = input { return nil }
         if let lastInputAt, now.timeIntervalSince(lastInputAt) > Self.timeout {
@@ -229,6 +290,9 @@ final class SnippetKeywordExpander {
         }
         matchTask?.cancel()
         matchTask = nil
+        holdFlushTask?.cancel()
+        holdFlushTask = nil
+        discardHeldEvents()
         tearDownTap()
         policy.reset()
     }
@@ -243,22 +307,33 @@ final class SnippetKeywordExpander {
         lastKeywordFingerprint = fingerprint(for: snippets.items)
     }
 
+    private struct HeldKey {
+        var keyCode: CGKeyCode
+        var flags: CGEventFlags
+        var text: String
+    }
+
+    private var heldKeys: [HeldKey] = []
+    private var swallowedKeyCodes: Set<Int64> = []
+    private var isFlushing = false
+    private var holdFlushTask: Task<Void, Never>?
+
     private func installTapIfNeeded() {
         guard AccessibilityFieldReader.isTrusted else { return }
         guard tapPort == nil else { return }
 
         let mask: CGEventMask =
             (1 << CGEventType.keyDown.rawValue)
+            | (1 << CGEventType.keyUp.rawValue)
             | (1 << CGEventType.flagsChanged.rawValue)
 
         guard let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
-            options: .listenOnly,
+            options: .defaultTap,
             eventsOfInterest: mask,
             callback: { _, type, event, _ in
-                SnippetKeywordExpander.handleTap(type: type, event: event)
-                return Unmanaged.passUnretained(event)
+                SnippetKeywordExpander.filterTap(type: type, event: event)
             },
             userInfo: nil
         ) else {
@@ -285,66 +360,156 @@ final class SnippetKeywordExpander {
         tapPort = nil
     }
 
-    nonisolated private static func handleTap(type: CGEventType, event: CGEvent) {
+    private enum TapAction {
+        case pass
+        case swallow
+    }
+
+    nonisolated private static func filterTap(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             Task { @MainActor in
                 if let tapPort = Self.active?.tapPort {
                     CGEvent.tapEnable(tap: tapPort, enable: true)
                 }
             }
-            return
+            return Unmanaged.passUnretained(event)
         }
 
-        let typeRaw = type.rawValue
-        let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-        let flags = event.flags
-        let userData = event.getIntegerValueField(.eventSourceUserData)
-        let text = event.keyboardStringIndentingDeadKeys()
-        let secure = IsSecureEventInputEnabled()
+        let snapshot = EventSnapshot(
+            type: type,
+            keyCode: event.getIntegerValueField(.keyboardEventKeycode),
+            flags: event.flags,
+            userData: event.getIntegerValueField(.eventSourceUserData),
+            text: event.keyboardStringIndentingDeadKeys(),
+            secure: IsSecureEventInputEnabled()
+        )
 
-        Task { @MainActor in
-            Self.active?.processEvent(
-                typeRaw: typeRaw,
-                keyCode: keyCode,
-                flags: flags,
-                text: text,
-                userData: userData,
-                secureEventInputEnabled: secure
-            )
+        guard Thread.isMainThread else {
+            return Unmanaged.passUnretained(event)
+        }
+        let action = MainActor.assumeIsolated {
+            Self.active?.decide(snapshot) ?? .pass
+        }
+        switch action {
+        case .pass: return Unmanaged.passUnretained(event)
+        case .swallow: return nil
         }
     }
 
-    private func processEvent(
-        typeRaw: UInt32,
-        keyCode: Int64,
-        flags: CGEventFlags,
-        text: String?,
-        userData: Int64,
-        secureEventInputEnabled: Bool
-    ) {
-        guard !isExpanding else { return }
+    private struct EventSnapshot {
+        var type: CGEventType
+        var keyCode: Int64
+        var flags: CGEventFlags
+        var userData: Int64
+        var text: String?
+        var secure: Bool
+    }
+
+    private func decide(_ event: EventSnapshot) -> TapAction {
+        if isFlushing || isExpanding {
+            return .pass
+        }
+        if event.userData == Self.syntheticTag {
+            return .pass
+        }
+
+        if event.type == .keyUp {
+            if swallowedKeyCodes.remove(event.keyCode) != nil {
+                return .swallow
+            }
+            return .pass
+        }
+
         refreshKeywordsIfNeeded()
 
         let input = SnippetKeywordPolicy.classifyInput(
-            text: text,
-            isSynthetic: userData == Self.syntheticTag,
-            secureEventInputEnabled: secureEventInputEnabled,
-            isFlagsChanged: typeRaw == CGEventType.flagsChanged.rawValue,
-            isKeyDown: typeRaw == CGEventType.keyDown.rawValue,
-            hasCommandOrControl: flags.contains(.maskCommand) || flags.contains(.maskControl),
-            isResetKey: Self.resetKeyCodes.contains(keyCode),
-            isDeleteBackward: keyCode == 51
+            text: event.text,
+            isSynthetic: false,
+            secureEventInputEnabled: event.secure,
+            isFlagsChanged: event.type == .flagsChanged,
+            isKeyDown: event.type == .keyDown,
+            hasCommandOrControl: event.flags.contains(.maskCommand) || event.flags.contains(.maskControl),
+            isResetKey: Self.resetKeyCodes.contains(event.keyCode),
+            isDeleteBackward: event.keyCode == 51
         )
 
-        guard let match = policy.process(input, at: Date()) else { return }
-
-        matchTask?.cancel()
-        matchTask = Task { @MainActor in
-            // Let the triggering keystroke land first.
-            try? await Task.sleep(for: .milliseconds(16))
-            guard !Task.isCancelled else { return }
-            await deliver(match: match)
+        switch policy.evaluate(input, at: Date()) {
+        case .pass:
+            return .pass
+        case .flushAndPass:
+            flushHeldEvents()
+            return .pass
+        case .dropLastHeld:
+            if !heldKeys.isEmpty {
+                heldKeys.removeLast()
+                swallowedKeyCodes.insert(event.keyCode)
+                scheduleHoldFlush()
+                return .swallow
+            }
+            return .pass
+        case .hold:
+            heldKeys.append(HeldKey(
+                keyCode: CGKeyCode(event.keyCode),
+                flags: event.flags,
+                text: event.text ?? ""
+            ))
+            swallowedKeyCodes.insert(event.keyCode)
+            scheduleHoldFlush()
+            return .swallow
+        case .match(let match):
+            let alreadyTyped = max(0, match.deletionCount - heldKeys.count)
+            discardHeldEvents()
+            swallowedKeyCodes.insert(event.keyCode)
+            matchTask?.cancel()
+            matchTask = Task { @MainActor in
+                await self.deliver(match: match, deleteCount: alreadyTyped)
+            }
+            return .swallow
         }
+    }
+
+    private func scheduleHoldFlush() {
+        holdFlushTask?.cancel()
+        holdFlushTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            self.flushHeldEvents()
+        }
+    }
+
+    private func discardHeldEvents() {
+        holdFlushTask?.cancel()
+        holdFlushTask = nil
+        heldKeys.removeAll(keepingCapacity: true)
+    }
+
+    private func flushHeldEvents() {
+        holdFlushTask?.cancel()
+        holdFlushTask = nil
+        guard !heldKeys.isEmpty else { return }
+        isFlushing = true
+        let source = CGEventSource(stateID: .hidSystemState)
+        for held in heldKeys {
+            var units = Array(held.text.utf16)
+            let down = CGEvent(keyboardEventSource: source, virtualKey: held.keyCode, keyDown: true)
+            let up = CGEvent(keyboardEventSource: source, virtualKey: held.keyCode, keyDown: false)
+            down?.flags = held.flags
+            up?.flags = held.flags
+            if !units.isEmpty {
+                units.withUnsafeMutableBufferPointer { buf in
+                    guard let base = buf.baseAddress else { return }
+                    down?.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: base)
+                    up?.keyboardSetUnicodeString(stringLength: buf.count, unicodeString: base)
+                }
+            }
+            down?.setIntegerValueField(.eventSourceUserData, value: Self.syntheticTag)
+            up?.setIntegerValueField(.eventSourceUserData, value: Self.syntheticTag)
+            down?.post(tap: .cghidEventTap)
+            up?.post(tap: .cghidEventTap)
+            swallowedKeyCodes.remove(Int64(held.keyCode))
+        }
+        heldKeys.removeAll(keepingCapacity: true)
+        isFlushing = false
     }
 
     private func refreshKeywordsIfNeeded() {
@@ -357,11 +522,10 @@ final class SnippetKeywordExpander {
         items.map { "\($0.id.uuidString):\($0.keyword):\($0.text.count)" }.joined(separator: "|")
     }
 
-    private func deliver(match: SnippetKeywordPolicy.Match) async {
+    private func deliver(match: SnippetKeywordPolicy.Match, deleteCount: Int) async {
         guard AccessibilityFieldReader.isTrusted else { return }
         guard let snippet = snippets.items.first(where: { $0.id == match.snippetID }) else { return }
 
-        // Don't expand into Filit's own UI.
         if NSApp.keyWindow != nil {
             return
         }
@@ -372,8 +536,10 @@ final class SnippetKeywordExpander {
         let expanded = SnippetTemplateEngine.expand(snippet.text)
         guard !expanded.isEmpty else { return }
 
-        postDeletes(count: match.deletionCount)
-        try? await Task.sleep(for: .milliseconds(50))
+        if deleteCount > 0 {
+            postDeletes(count: deleteCount)
+            try? await Task.sleep(for: .milliseconds(30))
+        }
         try? pasteInserter.typeAtCaret(expanded, syntheticTag: Self.syntheticTag)
     }
 
