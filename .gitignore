@@ -1,0 +1,13 @@
+.DS_Store
+build/
+DerivedData/
+dist/
+*.xcuserstate
+xcuserdata/
+.env
+.env.*
+!.env.example
+.agents/
+.cursor/
+skills-lock.json
+*.app
