@@ -1,5 +1,7 @@
 # Filit
 
+<img src="docs/icon.png" width="128" alt="Filit">
+
 Filit is a macOS menu bar app that pastes the *right* value into the field you are sitting in.
 
 Copy a resume, a bio, or a contact block once. Click into a form — name, email, company, phone, whatever the label is — and press **⌥⌘V**. Filit reads the field, gathers candidates from your pinned source, clipboard history, and snippets, then asks [TypeSafe](https://typesafe.ai) which value belongs there. It pastes that string. Nothing else.
