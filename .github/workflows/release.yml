@@ -1,0 +1,162 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: ${{ !contains(github.event.head_commit.message || '', '[skip release]') }}
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Resolve next version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          latest="$(gh release list --limit 1 --json tagName --jq '.[0].tagName // empty' 2>/dev/null || true)"
+          if [[ -z "$latest" ]]; then
+            latest="$(git tag -l 'v*' --sort=-v:refname | head -1 || true)"
+          fi
+          if [[ -z "$latest" ]]; then
+            latest="v0.0.0"
+          fi
+          ver="${latest#v}"
+          IFS='.' read -r major minor patch <<<"$ver"
+          major="${major:-0}"
+          minor="${minor:-0}"
+          patch="${patch:-0}"
+          patch=$((patch + 1))
+          next="${major}.${minor}.${patch}"
+          {
+            echo "version=${next}"
+            echo "tag=v${next}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Previous ${latest} → next v${next}"
+
+      - name: Build and package
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          chmod +x Scripts/package_app.sh
+          Scripts/package_app.sh
+          sha="$(shasum -a 256 "dist/Filit-${VERSION}.zip" | awk '{print $1}')"
+          echo "sha256=${sha}" >> "$GITHUB_OUTPUT"
+          echo "SHA256 ${sha}"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          subject="$(git log -1 --pretty=format:'%s' "$SHA")"
+          body="$(git log -1 --pretty=format:'%b' "$SHA" | head -c 2000)"
+          gh release create "$TAG" \
+            --title "Filit ${VERSION}" \
+            --notes "## Filit ${VERSION}
+
+          Automated release from \`main\` (\`${SHA:0:7}\`).
+
+          **${subject}**
+
+          ${body}
+
+          ### Install
+
+          \`\`\`bash
+          brew tap AR-1106/tap
+          brew upgrade --cask filit
+          \`\`\`
+
+          Or download \`Filit-${VERSION}.zip\` below and move \`Filit.app\` into Applications." \
+            "dist/Filit-${VERSION}.zip"
+
+      - name: Update Homebrew tap
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA256: ${{ steps.package.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set. GitHub Release published, but the Homebrew cask was not updated."
+            exit 0
+          fi
+
+          tmp="$(mktemp -d)"
+          gh repo clone AR-1106/homebrew-tap "$tmp/tap"
+          cd "$tmp/tap"
+
+          python3 - <<'PY'
+          import os
+          version = os.environ["VERSION"]
+          sha256 = os.environ["SHA256"]
+          open("Casks/filit.rb", "w").write(f'''cask "filit" do
+            version "{version}"
+            sha256 "{sha256}"
+
+            url "https://github.com/AR-1106/filit/releases/download/v#{{version}}/Filit-#{{version}}.zip"
+            name "Filit"
+            desc "Smart paste powered by TypeSafe"
+            homepage "https://github.com/AR-1106/filit"
+
+            livecheck do
+              url :url
+              strategy :github_latest
+            end
+
+            depends_on macos: :sonoma
+
+            app "Filit.app"
+
+            postflight_steps do
+              run "/usr/bin/xattr",
+                  args:         ["-cr", "{{appdir}}/Filit.app"],
+                  must_succeed: false
+            end
+
+            zap trash: [
+              "~/Library/Application Support/Filit",
+              "~/Library/Preferences/com.filit.app.plist",
+            ]
+
+            caveats <<~EOS
+              Open Filit from Applications or Spotlight. The welcome window
+              walks through Accessibility and your TypeSafe API key.
+            EOS
+          end
+          ''')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/filit.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew cask already up to date"
+            exit 0
+          fi
+          git commit -m "filit ${VERSION}"
+          git push origin HEAD:main

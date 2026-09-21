@@ -61,7 +61,9 @@ brew tap AR-1106/tap
 brew install --cask filit
 ```
 
-Or grab `Filit-0.1.0.zip` from [Releases](https://github.com/AR-1106/filit/releases) and move `Filit.app` into Applications.
+Or download the latest `Filit-*.zip` from [Releases](https://github.com/AR-1106/filit/releases) and move `Filit.app` into Applications.
+
+Every merge to `main` publishes a new GitHub Release (and updates the Homebrew cask when CI secrets are configured). Use `brew upgrade --cask filit` to get it.
 
 ## First launch
 
