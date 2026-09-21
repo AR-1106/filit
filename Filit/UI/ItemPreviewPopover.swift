@@ -119,6 +119,7 @@ struct ItemPreviewPopover: View {
 }
 
 enum PreviewEdgeHelper {
+    @MainActor
     static func arrowEdge(for window: NSWindow?) -> Edge {
         guard let window, let screen = window.screen ?? NSScreen.main else {
             return .trailing
