@@ -40,7 +40,8 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 16)
+        .padding(.top, 28)
+        .padding(.bottom, 16)
     }
 
     private var intro: some View {

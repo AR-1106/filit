@@ -18,6 +18,7 @@ final class AppState: NSObject, ObservableObject {
         title: "Filit",
         size: NSSize(width: 420, height: 520),
         chrome: .borderlessRounded,
+        presentation: .palette,
         activatesApplication: false
     ) { appState in
         FilitLauncherView()
@@ -27,7 +28,8 @@ final class AppState: NSObject, ObservableObject {
     lazy var settingsPanel = FloatingPanelController(
         title: "Settings",
         size: NSSize(width: 460, height: 600),
-        chrome: .borderlessRounded
+        chrome: .borderlessRounded,
+        presentation: .window
     ) { appState in
         SettingsView()
             .environmentObject(appState)
@@ -36,7 +38,8 @@ final class AppState: NSObject, ObservableObject {
     lazy var onboardingPanel = FloatingPanelController(
         title: "Welcome to Filit",
         size: NSSize(width: 440, height: 560),
-        chrome: .borderlessRounded
+        chrome: .borderlessRounded,
+        presentation: .window
     ) { appState in
         OnboardingView()
             .environmentObject(appState)
