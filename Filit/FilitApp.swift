@@ -13,8 +13,8 @@ struct FilitApp: App {
                     appState.installURLHandler()
                 }
         } label: {
-            Image(systemName: "doc.on.clipboard.fill")
-                .symbolRenderingMode(.hierarchical)
+            Image(systemName: FilitSymbol.name)
+                .symbolRenderingMode(.monochrome)
         }
         .menuBarExtraStyle(.menu)
     }

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0513882B31A8EE25665C79E4 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF810052CFDBCD2BEEE068CC /* SettingsView.swift */; };
+		0B2481936FA788D227173D1B /* FilitSymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21900DCF4466149F494B5B5E /* FilitSymbol.swift */; };
 		2CB1531F4D00DF90CCEDBF94 /* FieldContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF441F955F854DD771DCE00D /* FieldContext.swift */; };
 		3EC0A9C2E7940DD8889C0EC2 /* SnippetKeywordExpander.swift in Sources */ = {isa = PBXBuildFile; fileRef = 115454D279926FE8F1CF32A6 /* SnippetKeywordExpander.swift */; };
 		50E6E51125DEE29167B707F1 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1AA617541CF9E7D951621B1 /* MenuBarView.swift */; };
@@ -34,6 +35,7 @@
 		108DB9BF6DB24FD1D64840DB /* PasteCost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteCost.swift; sourceTree = "<group>"; };
 		115454D279926FE8F1CF32A6 /* SnippetKeywordExpander.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnippetKeywordExpander.swift; sourceTree = "<group>"; };
 		1D1437DE2897CE28CF7F8A8B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		21900DCF4466149F494B5B5E /* FilitSymbol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilitSymbol.swift; sourceTree = "<group>"; };
 		27C0A1BC2DB0825391F7594B /* FilitLauncherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilitLauncherView.swift; sourceTree = "<group>"; };
 		29E0298E83D0DFCA1AD9015B /* Filit.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Filit.entitlements; sourceTree = "<group>"; };
 		2FE00DC26B88E7E9BD78349E /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -168,6 +170,7 @@
 			children = (
 				E41494EAE40F5203024738D7 /* FilitGlass.swift */,
 				27C0A1BC2DB0825391F7594B /* FilitLauncherView.swift */,
+				21900DCF4466149F494B5B5E /* FilitSymbol.swift */,
 				F58F5151301ECC8D539687BA /* FloatingPanelController.swift */,
 				D8354CA8A95132C4CD783741 /* ItemPreviewPopover.swift */,
 			);
@@ -260,6 +263,7 @@
 				D38EB30F7483CA848FB6B7DD /* FilitApp.swift in Sources */,
 				CEACF0E14C4B07A7F5E2B025 /* FilitGlass.swift in Sources */,
 				985C23B8F871866E12EA67FB /* FilitLauncherView.swift in Sources */,
+				0B2481936FA788D227173D1B /* FilitSymbol.swift in Sources */,
 				9A4148B444D6059F78A969B9 /* FloatingPanelController.swift in Sources */,
 				C88223893BFF0415AF3E1745 /* HotkeyManager.swift in Sources */,
 				C766B866324F288D79667434 /* ItemPreviewPopover.swift in Sources */,
